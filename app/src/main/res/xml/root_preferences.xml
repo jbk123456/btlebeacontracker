@@ -1,0 +1,17 @@
+<PreferenceScreen xmlns:app="http://schemas.android.com/apk/res-auto"
+    xmlns:android="http://schemas.android.com/apk/res/android">
+
+    <PreferenceCategory app:title="@string/alarm">
+
+         <ListPreference
+            app:defaultValue="0"
+            app:entries="@array/alarm_duration_entries"
+            app:entryValues="@array/alarm_duration_values"
+            app:key="alarm_duration"
+            app:title="@string/alarm_duration_title"
+            android:inputType="numberDecimal"
+            app:useSimpleSummaryProvider="true" />
+
+    </PreferenceCategory>
+
+</PreferenceScreen>
