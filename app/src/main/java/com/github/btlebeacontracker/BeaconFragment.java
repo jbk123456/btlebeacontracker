@@ -121,7 +121,7 @@ public class BeaconFragment extends Fragment implements BluetoothLEService.Bluet
             serviceConnected();
         }
 
-        connected = true;
+        
         return rootView;
 
     }
