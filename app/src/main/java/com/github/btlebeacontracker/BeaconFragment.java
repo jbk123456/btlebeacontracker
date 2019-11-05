@@ -30,11 +30,18 @@ public class BeaconFragment extends Fragment implements BluetoothLEService.Bluet
     private ToggleButton bConnected;
     private Button bAlert;
     private final Handler handler = new Handler();
+
     private boolean connected;
+
     private final BeaconFragment.BeaconCallbacks EMPTY_CALLBACKS = new BeaconFragment.BeaconCallbacks() {
 
         @Override
         public void updateBeaconItem(String id, String caption) {
+
+        }
+
+        @Override
+        public void setTitle(String title) {
 
         }
 
@@ -121,34 +128,22 @@ public class BeaconFragment extends Fragment implements BluetoothLEService.Bluet
             serviceConnected();
         }
 
-        
+        getBeaconCallbacks().setTitle(getResources().getString(R.string.beacon));
         return rootView;
 
-    }
-
-    @Override
-    public void onResume() {
-        super.onResume();
-        connected = true;
     }
 
     @Override
     public void onPause() {
         super.onPause();
         handler.removeCallbacksAndMessages(READ_RSSI_CALLBACK_TOKEN);
+        // instead on onResume, the activity
+        // will invoke setMainFragment:serviceConnected() to initailize the link to the service
+        // and set conected to true
         connected = false;
-
-    }
-
-    @Override
-    public void onDestroyView() {
-        handler.removeCallbacksAndMessages(READ_RSSI_CALLBACK_TOKEN);
-
-        super.onDestroyView();
         if (getBeaconCallbacks().getService() != null) {
             getBeaconCallbacks().getService().unregisterClient(this);
         }
-        connected = false;
         if (getBeaconCallbacks().getService() != null) {
             getBeaconCallbacks().getService().disconnect(address);
         }
@@ -286,6 +281,7 @@ public class BeaconFragment extends Fragment implements BluetoothLEService.Bluet
 
     public interface BeaconCallbacks {
         void updateBeaconItem(String id, String caption);
+        void setTitle(String title);
 
         BluetoothLEService getService();
     }

@@ -59,6 +59,11 @@ public class ScanFragment extends ListFragment
         public BluetoothLEService getService() {
             return null;
         }
+
+        @Override
+        public void setTitle(String title) {
+
+        }
     };
 
     private ScanCallbacks getScanCallbacks() {
@@ -81,6 +86,8 @@ public class ScanFragment extends ListFragment
 
         showDevices(scanHelper.getDevices());
         connected = true;
+
+        getScanCallbacks().setTitle(getResources().getString(R.string.overview));
 
         return rootView;
     }
@@ -196,6 +203,8 @@ public class ScanFragment extends ListFragment
         BluetoothAdapter getBluetoothAdapter();
 
         BluetoothLEService getService();
+
+        void setTitle(String title);
     }
 
 }

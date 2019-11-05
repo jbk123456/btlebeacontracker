@@ -61,7 +61,7 @@ public class BluetoothLEService extends Service {
     private final HashMap<String, BluetoothGatt> bluetoothGatt = new HashMap<>();
     private final HashMap<String, Boolean> connected = new HashMap<>();
 
-    private BluetoothGattCharacteristic batteryCharacteristic;
+    private BluetoothGattCharacteristic bluetoothGattCharacteristic;
 
     private Vibrator vib;
     private AudioManager audio;
@@ -143,11 +143,21 @@ public class BluetoothLEService extends Service {
     }
 
     public void registerClient(BluetoothServiceCallbacks activity) {
-        activities.add(activity);
+        synchronized (activities) {
+            activities.add(activity);
+        }
     }
 
     public void unregisterClient(BluetoothServiceCallbacks activity) {
-        activities.remove(activity);
+        synchronized (activities) {
+            activities.remove(activity);
+        }
+    }
+
+    public void unregisterClients() {
+        synchronized (activities) {
+            activities.clear();
+        }
     }
 
     @Override
@@ -274,27 +284,25 @@ public class BluetoothLEService extends Service {
 
     public HashMap<String, Boolean> connect() {
         Log.d(TAG, "connect()");
-        synchronized (this) {
-            final Cursor cursor = Devices.findDevices(this);
-            if (cursor != null && cursor.getCount() > 0) {
-                cursor.moveToFirst();
-                do {
-                    final String address = cursor.getString(0);
-                    try {
-                        if (Devices.isEnabled(this, address)) {
-                            connect(address);
-                        } else {
-                            connected.remove(address); // may be reverted by callback, if device is still alive at this point
-                            disconnect(address);
-                        }
-                    } catch (Throwable t) {
-                        t.printStackTrace();
+        final Cursor cursor = Devices.findDevices(this);
+        if (cursor != null && cursor.getCount() > 0) {
+            cursor.moveToFirst();
+            do {
+                final String address = cursor.getString(0);
+                try {
+                    if (Devices.isEnabled(this, address)) {
+                        connect(address);
+                    } else {
+                        connected.remove(address); // may be reverted by callback, if device is still alive at this point
+                        disconnect(address);
                     }
-                } while (cursor.moveToNext());
-            }
-            updateNotification();
-            return connected;
+                } catch (Throwable t) {
+                    t.printStackTrace();
+                }
+            } while (cursor.moveToNext());
         }
+        updateNotification();
+        return connected;
     }
 
     public void connect(final String address) {
@@ -359,8 +367,10 @@ public class BluetoothLEService extends Service {
             if (BluetoothGatt.GATT_SUCCESS == status) {
                 Log.d(TAG, "onConnectionStateChange() address: " + address + " newState => " + newState);
                 if (newState == BluetoothProfile.STATE_CONNECTED) {
-                    for (BluetoothServiceCallbacks activity : activities) {
-                        activity.gattConnected(address);
+                    synchronized (activities) {
+                        for (BluetoothServiceCallbacks activity : activities) {
+                            activity.gattConnected(address);
+                        }
                     }
                     connected.put(address, true);
                     updateNotification();
@@ -384,8 +394,10 @@ public class BluetoothLEService extends Service {
                 }
                 updateNotification();
                 enablePeerDeviceNotifyMe(gatt, false);
-                for (BluetoothServiceCallbacks activity : activities) {
-                    activity.gattDisconnected(address);
+                synchronized (activities) {
+                    for (BluetoothServiceCallbacks activity : activities) {
+                        activity.gattDisconnected(address);
+                    }
                 }
             }
         }
@@ -396,25 +408,30 @@ public class BluetoothLEService extends Service {
 
             // final Intent rssiIntent = new Intent(RSSI_RECEIVED);
             //rssiIntent.putExtra(RSSI_RECEIVED, rssi);
-            for (BluetoothServiceCallbacks activity : activities) {
-                activity.onRssi(address, rssi);
+            synchronized (activities) {
+                for (BluetoothServiceCallbacks activity : activities) {
+                    activity.onRssi(address, rssi);
+                }
             }
         }
 
         @Override
         public void onServicesDiscovered(final BluetoothGatt gatt, int status) {
             Log.d(TAG, "onServicesDiscovered()");
-
-            for (BluetoothServiceCallbacks activity : activities) {
-                activity.onservicesDiscovered(address);
+            synchronized (activities) {
+                for (BluetoothServiceCallbacks activity : activities) {
+                    activity.onservicesDiscovered(address);
+                }
             }
             if (BluetoothGatt.GATT_SUCCESS == status) {
 
                 for (BluetoothGattService service : gatt.getServices()) {
                     if (IMMEDIATE_ALERT_SERVICE.equals(service.getUuid())) {
 
-                        for (BluetoothServiceCallbacks activity : activities) {
-                            activity.onImmediateAlertAvailable(address);
+                        synchronized (activities) {
+                            for (BluetoothServiceCallbacks activity : activities) {
+                                activity.onImmediateAlertAvailable(address);
+                            }
                         }
                         gatt.readCharacteristic(
                                 getCharacteristic(gatt, IMMEDIATE_ALERT_SERVICE, ALERT_LEVEL_CHARACTERISTIC));
@@ -427,8 +444,8 @@ public class BluetoothLEService extends Service {
 //                    }
 
                     if (BATTERY_SERVICE.equals(service.getUuid())) {
-                        batteryCharacteristic = service.getCharacteristics().get(0);
-                        gatt.readCharacteristic(batteryCharacteristic);
+                        bluetoothGattCharacteristic = service.getCharacteristics().get(0);
+                        gatt.readCharacteristic(bluetoothGattCharacteristic);
                     }
 
                     if (FIND_ME_SERVICE.equals(service.getUuid())) {
@@ -446,7 +463,7 @@ public class BluetoothLEService extends Service {
         public void onDescriptorWrite(BluetoothGatt gatt, BluetoothGattDescriptor descriptor, int status) {
             Log.d(TAG, "onDescriptorWrite() descriptor: " + descriptor + " status => " + status);
 
-            gatt.readCharacteristic(batteryCharacteristic);
+            gatt.readCharacteristic(bluetoothGattCharacteristic);
         }
 
         @Override
@@ -460,8 +477,10 @@ public class BluetoothLEService extends Service {
             Log.d(TAG, "onCharacteristicRead() address: " + characteristic + " status => " + status);
             if (characteristic.getValue() != null && characteristic.getValue().length > 0) {
                 final byte level = characteristic.getValue()[0];
-                for (BluetoothServiceCallbacks activity : activities) {
-                    activity.onBatteryLevel(address, (int) level);
+                synchronized (activities) {
+                    for (BluetoothServiceCallbacks activity : activities) {
+                        activity.onBatteryLevel(address, (int) level);
+                    }
                 }
             }
         }

@@ -8,12 +8,14 @@ import android.content.Context;
 import android.content.Intent;
 import android.content.pm.PackageManager;
 import android.database.Cursor;
+import android.location.LocationManager;
 import android.os.Bundle;
 import android.os.Handler;
 import android.os.IBinder;
 import android.util.Log;
 import android.view.Menu;
 import android.view.MenuItem;
+import android.widget.Toast;
 
 import androidx.annotation.NonNull;
 import androidx.appcompat.app.ActionBarDrawerToggle;
@@ -42,7 +44,6 @@ public class BeaconsActivity extends AppCompatActivity
         implements BluetoothLEService.BluetoothServiceCallbacks, NavigationView.OnNavigationItemSelectedListener, ScanFragment.ScanCallbacks, BeaconFragment.BeaconCallbacks {
 
     // --Commented out by Inspection (02.11.2019 15:32):public static final String TAG = BeaconsActivity.class.toString();
-    private static final int REQUEST_ENABLE_BT = 1;
     private final Set<Item> devices = new HashSet<>();
     private BluetoothLEService service;
 
@@ -66,47 +67,23 @@ public class BeaconsActivity extends AppCompatActivity
 
                 initializeDrawerConnectedIcons(devicesConnected);
 
-                setMainFragment();
-            }
-        }
-
-        private void setMainFragment() {
-            handler.post(new Runnable() {
-                @Override
-                public void run() {
-                    Fragment visibleFragment;
-                    if (devices.isEmpty()) {
-                        FragmentTransaction transaction = getSupportFragmentManager().beginTransaction();
-                        transaction.replace(R.id.fragment_container, new ScanFragment());
-                        transaction.commit();
-                    } else if ((visibleFragment = getVisibleFragment()) == null) {
-                        FragmentTransaction transaction = getSupportFragmentManager().beginTransaction();
-                        Item item = devices.iterator().next();
-                        transaction.replace(R.id.fragment_container, new BeaconFragment().init(item.getId(), item.getCaption()));
-                        transaction.commit();
-                    } else { // restored instance state, re-attach service and update view from service
-                        ((IServiceConnectionListener) visibleFragment).serviceConnected();
-                    }
+                Fragment visibleFragment;
+                if ((visibleFragment = getVisibleFragment()) != null) {
+                    ((IServiceConnectionListener) visibleFragment).serviceConnected();
                 }
-            });
-
-        }
-
-        private Fragment getVisibleFragment() {
-            FragmentManager fragmentManager = getSupportFragmentManager();
-            List<Fragment> fragments = fragmentManager.getFragments();
-            for (Fragment fragment : fragments) {
-                if (fragment != null && fragment.isVisible())
-                    return fragment;
             }
-            return null;
         }
 
         @Override
         public void onServiceDisconnected(ComponentName componentName) {
-            service.unregisterClient(BeaconsActivity.this);
             Log.d(BluetoothLEService.TAG, "onServiceDisconnected()");
             service = null;
+            handler.post(new Runnable() {
+                @Override
+                public void run() {
+                    finish();
+                }
+            });
         }
     };
 
@@ -119,19 +96,53 @@ public class BeaconsActivity extends AppCompatActivity
             }
         }
     }
+    private void setMainFragment() {
+        handler.post(new Runnable() {
+            @Override
+            public void run() {
+                if (devices.isEmpty()) {
+                    showScanFragment();
+                } else if ((getVisibleFragment()) == null) {
+                    Item item = devices.iterator().next();
+                    showFragmentForDevice(item.getId(), item.getCaption());
+                }
+            }
+        });
+
+    }
+
+    private Fragment getVisibleFragment() {
+        FragmentManager fragmentManager = getSupportFragmentManager();
+        List<Fragment> fragments = fragmentManager.getFragments();
+        for (Fragment fragment : fragments) {
+            if (fragment != null && fragment.isVisible())
+                return fragment;
+        }
+        return null;
+    }
+
 
     @Override
     protected void onStart() {
         super.onStart();
 
+        initializeManagedBeaconItems();
+        setMainFragment();
         bindService(new Intent(this, BluetoothLEService.class), serviceConnection, 0);
+    }
+    @Override
+    protected void onRestart() {
+        super.onRestart();
     }
 
     @Override
     protected void onStop() {
         super.onStop();
-        this.service = null;
         unbindService(serviceConnection);
+        if (service!=null) {
+            service.unregisterClients();
+        }
+        service = null;
     }
 
     @Override
@@ -158,11 +169,17 @@ public class BeaconsActivity extends AppCompatActivity
             ActivityCompat.requestPermissions(this, new String[]{Manifest.permission.ACCESS_COARSE_LOCATION}, 0);
         }
 
-
         // detect Bluetooth enabled
         if (mBluetoothAdapter == null || !mBluetoothAdapter.isEnabled()) {
-            Intent enableBtIntent = new Intent(BluetoothAdapter.ACTION_REQUEST_ENABLE);
-            startActivityForResult(enableBtIntent, REQUEST_ENABLE_BT);
+            Intent intent = new Intent(BluetoothAdapter.ACTION_REQUEST_ENABLE);
+            startActivity(intent);
+        }
+        // detect Location enabled
+        final LocationManager locationManager = (LocationManager) getSystemService(Context.LOCATION_SERVICE);
+        if (locationManager==null || !locationManager.isProviderEnabled(LocationManager.GPS_PROVIDER)) {
+            Toast.makeText(this, getResources().getString(R.string.enable_location), Toast.LENGTH_LONG).show();
+            Intent intent = new Intent(android.provider.Settings.ACTION_LOCATION_SOURCE_SETTINGS);
+            startActivity(intent);
         }
 
         Toolbar toolbar = findViewById(R.id.toolbar);
@@ -177,8 +194,6 @@ public class BeaconsActivity extends AppCompatActivity
 
         toggle.syncState();
 
-
-        initializeManagedBeaconItems();
 
         final BluetoothManager bluetoothManager = (BluetoothManager) getSystemService(Context.BLUETOOTH_SERVICE);
         mBluetoothAdapter = Objects.requireNonNull(bluetoothManager).getAdapter();
@@ -272,6 +287,11 @@ public class BeaconsActivity extends AppCompatActivity
     @Override
     public BluetoothLEService getService() {
         return service;
+    }
+
+    @Override
+    public void setTitle(String title) {
+        Objects.requireNonNull(getSupportActionBar()).setTitle(title);
     }
 
     @Override

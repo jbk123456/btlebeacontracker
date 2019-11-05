@@ -75,7 +75,8 @@ class ScanHelper {
             } while (cursor.moveToNext());
         }
 
-        final Toast text = Toast.makeText(context, "Scanning...", Toast.LENGTH_LONG);
+
+        final Toast text = Toast.makeText(context, context.getResources().getString(R.string.scanning), Toast.LENGTH_LONG);
         stopScan = new Runnable() {
             @Override
             public void run() {
@@ -84,7 +85,7 @@ class ScanHelper {
                 text.cancel();
                 scanObserver.finishScan(devices);
                 if (noDevices)
-                    Toast.makeText(context, "No new devices found!", Toast.LENGTH_SHORT).show();
+                    Toast.makeText(context, context.getResources().getString(R.string.no_beacons_found), Toast.LENGTH_SHORT).show();
 
             }
         };
