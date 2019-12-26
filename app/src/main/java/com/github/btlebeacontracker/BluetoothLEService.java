@@ -186,6 +186,7 @@ public class BluetoothLEService extends Service {
 
         final Notification notification = getNotificationBuilder().build();
         this.startForeground(FOREGROUND_ID, notification);
+        connect(); //FIXME: needed for autostart
     }
 
     private NotificationCompat.Builder getNotificationBuilder() {
