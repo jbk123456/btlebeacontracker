@@ -1,5 +1,7 @@
 package com.github.btlebeacontracker;
 
+import static android.app.PendingIntent.*;
+
 import android.app.Notification;
 import android.app.NotificationChannel;
 import android.app.NotificationManager;
@@ -16,6 +18,9 @@ import android.bluetooth.BluetoothProfile;
 import android.content.Context;
 import android.content.Intent;
 import android.database.Cursor;
+import android.graphics.Bitmap;
+import android.graphics.BitmapFactory;
+import android.graphics.Color;
 import android.media.AudioManager;
 import android.media.MediaPlayer;
 import android.os.Binder;
@@ -189,17 +194,15 @@ public class BluetoothLEService extends Service {
         connect(); //FIXME: needed for autostart
     }
 
-    private NotificationCompat.Builder getNotificationBuilder() {
+    private Notification.Builder getNotificationBuilder() {
         Intent notificationIntent = new Intent(this, BeaconsActivity.class);
-        PendingIntent pendingIntent = PendingIntent.getActivity(this,
-                0, notificationIntent, 0);
-        return new NotificationCompat.Builder(this, CHANNEL_ID)
-                //.setContentTitle(getText(R.string.app_name))
-                //.setContentText(getText(R.string.foreground_started))
+        PendingIntent pendingIntent = getActivity(this,
+                0, notificationIntent, FLAG_IMMUTABLE);
+
+        return new Notification.Builder(this, CHANNEL_ID)
                 .setContentTitle(getText(R.string.foreground_started))
-                .setSmallIcon(R.drawable.ic_launcher).setShowWhen(true).setOngoing(true)
-                .setLargeIcon(null)
-                .setContentIntent(pendingIntent);
+                .setContentIntent(pendingIntent).setSmallIcon(R.drawable.ic_launcher).setShowWhen(true).setOngoing(true)
+                .setColor(ContextCompat.getColor(this, R.color.colorPrimary)).setColorized(true);
     }
 
     private void updateNotification() {
@@ -207,14 +210,15 @@ public class BluetoothLEService extends Service {
         if (health == null) {
             return;
         }
-        NotificationCompat.Builder notificationBuilder = getNotificationBuilder();
-        //notificationBuilder.setContentText(health);
+
+        Notification.Builder notificationBuilder = getNotificationBuilder();
         notificationBuilder.setContentTitle(health);
-        if (failedCountOld > 0) {
-            notificationBuilder.setColorized(true);
-            notificationBuilder.setColor(ContextCompat.getColor(this, R.color.colorAccent));
-        }
         notificationBuilder.setNumber(countOld - failedCountOld);
+
+        if (failedCountOld > 0) {
+            notificationBuilder.setSmallIcon(R.drawable.ic_no_phonelink).setColor(ContextCompat.getColor(this, R.color.colorAccent));
+        }
+
         notificationManager.notify(FOREGROUND_ID, notificationBuilder.build());
     }
 
@@ -326,8 +330,8 @@ public class BluetoothLEService extends Service {
             if (Devices.isEnabled(this, address))
                 return;
             Log.d(TAG, "disconnect() - from device " + address);
-            if (this.bluetoothGatt.get(address) != null) {
-                BluetoothGatt gatt = this.bluetoothGatt.get(address);
+            BluetoothGatt gatt = this.bluetoothGatt.get(address);
+            if (gatt != null) {
                 gatt.disconnect();
                 gatt.close();
             }
