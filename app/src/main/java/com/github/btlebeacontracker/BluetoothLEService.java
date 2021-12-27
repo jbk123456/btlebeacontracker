@@ -327,7 +327,9 @@ public class BluetoothLEService extends Service {
                 return;
             Log.d(TAG, "disconnect() - from device " + address);
             if (this.bluetoothGatt.get(address) != null) {
-                Objects.requireNonNull(this.bluetoothGatt.get(address)).disconnect();
+                BluetoothGatt gatt = this.bluetoothGatt.get(address);
+                gatt.disconnect();
+                gatt.close();
             }
             this.bluetoothGatt.remove(address);
         }
@@ -377,10 +379,6 @@ public class BluetoothLEService extends Service {
                     updateNotification();
                     stopSound(mediaMap.remove(address));
                     gatt.discoverServices();
-                }
-
-                if (newState == BluetoothProfile.STATE_DISCONNECTED) {
-                    gatt.close();
                 }
             }
 
